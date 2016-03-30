@@ -66,6 +66,67 @@ credentials.profile = {
 
 Specific fields may vary depending on the identity provider used. For more information, [refer to the documentation on user profiles](https://auth0.com/docs/user-profile/normalized).
 
+### Azure AD
+
+[Provider Documentation](https://msdn.microsoft.com/en-us/library/azure/dn645545.aspx)
+
+- `scope`: not set, defaults to `user_impersonation`
+- `config`:
+  - `tenant`: __Required__, your Azure AD tenant name, such as `contsco.com`.
+  - `resource`: Optional, directory resource to request access for, defaults to `https://graph.windows.net`
+  - `providerUri`: Optional, oauth2 provider URI
+  - `graphUri`: Optional, AD graph base URI
+  - `apiVersion`: Optional, AD graph request/response version
+  - `requestMe`: Optional, automatically request the `/me` graph entity, defaults to `true`
+  - `entities`: Optional, array of additional graph entities to load into the profile, either `property` or `handler` must be specified.
+    - `path`: __Required__, entity path to request, example `/me/memberOf`
+    - `property`: Property name within the profile object to insert the Graph API response. Example `foo` will fulfill `profile.foo = {...}`
+    - `handler`: Callback handler in the form of `(profile, data)` to modify the profile object in a custom way based of the Graph API response passed as `data`
+  - `auth`: [/{tenant}/oauth2/authorize](https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx)
+  - `token`: [/{tenant}/oauth2/token](https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx)
+
+The default profile response will look like this:
+
+```javascript
+credentials.profile = {
+    id: profile.objectId,
+    username: profile.userPrincipalName,
+    displayName: profile.displayName,
+    email: profile.mail,
+    name: {
+        first: profile.givenName,
+        last: profile.surname
+    },
+    raw: profile
+};
+```
+
+To request additional graph entities, use the `entities` property of config, properties are not exposed through scopes, but through
+sub requests to the [Azure AD Graph API](https://azure.microsoft.com/en-us/documentation/articles/active-directory-graph-api-quickstart/).
+
+```javascript
+{
+    config: {
+        entities: [
+            // Property assignment
+            {
+                path: '/me/memberOf',
+                // Will insert the result of the Graph query into credentials.profile.memberships
+                property: 'memberships'
+            },
+            // Custom handler
+            {
+                path: '/me/memberOf',
+                // Will be called when the Graph API request has completed
+                handler: (profile, graphData) => {
+                    profile.membership_ids = graphData.value.map(i => i.objectId);
+                }
+            }
+        ]
+    }
+}
+```
+
 ### Bitbucket
 
 [Provider Documentation](https://confluence.atlassian.com/bitbucket/oauth-on-bitbucket-238027431.html)
