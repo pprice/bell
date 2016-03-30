@@ -272,7 +272,7 @@ exports.override = function (uri, payload) {
 
             if (dest.indexOf(uri) === 0) {
                 if (typeof payload === 'function') {
-                    return payload(dest);
+                    return payload(dest, callback);
                 }
 
                 if (payload instanceof Error) {
