@@ -1041,6 +1041,97 @@ describe('Bell', () => {
             });
         });
 
+        it('authenticates an endpoint with parameters from the provider object', (done) => {
+
+            const mock = new Mock.V2();
+            mock.start((provider) => {
+
+                const server = new Hapi.Server();
+                server.connection({ host: 'localhost', port: 80 });
+                server.register(Bell, (err) => {
+
+                    provider.providerParams = {
+                        providerSpecial: true
+                    };
+
+                    expect(err).to.not.exist();
+
+                    server.auth.strategy('custom', 'bell', {
+                        password: 'cookie_encryption_password_secure',
+                        isSecure: false,
+                        clientId: 'test',
+                        clientSecret: 'secret',
+                        provider: provider
+                    });
+
+                    server.route({
+                        method: '*',
+                        path: '/login',
+                        config: {
+                            auth: 'custom',
+                            handler: function (request, reply) {
+
+                                reply(request.auth.credentials);
+                            }
+                        }
+                    });
+
+                    server.inject('/login', (res) => {
+
+                        expect(res.headers.location).to.contain(mock.uri + '/auth?providerSpecial=true&client_id=test&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A80%2Flogin&state=');
+                        mock.stop(done);
+                    });
+                });
+            });
+        });
+
+        it('authenticates an endpoint with parameters from providerParams over the provider object', (done) => {
+
+            const mock = new Mock.V2();
+            mock.start((provider) => {
+
+                const server = new Hapi.Server();
+                server.connection({ host: 'localhost', port: 80 });
+                server.register(Bell, (err) => {
+
+                    provider.providerParams = {
+                        special: false
+                    };
+
+                    expect(err).to.not.exist();
+
+                    server.auth.strategy('custom', 'bell', {
+                        password: 'cookie_encryption_password_secure',
+                        isSecure: false,
+                        clientId: 'test',
+                        clientSecret: 'secret',
+                        provider: provider,
+                        providerParams: {
+                            special: true
+                        }
+                    });
+
+                    server.route({
+                        method: '*',
+                        path: '/login',
+                        config: {
+                            auth: 'custom',
+                            handler: function (request, reply) {
+
+                                reply(request.auth.credentials);
+                            }
+                        }
+                    });
+
+                    server.inject('/login', (res) => {
+
+                        expect(res.headers.location).to.contain(mock.uri + '/auth?special=true&client_id=test&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A80%2Flogin&state=');
+                        mock.stop(done);
+                    });
+                });
+            });
+        });
+
         it('forces https in redirect_uri when set in options', (done) => {
 
             const mock = new Mock.V2();
