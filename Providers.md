@@ -80,6 +80,7 @@ Specific fields may vary depending on the identity provider used. For more infor
   - `requestMe`: Optional, automatically request the `/me` graph entity, defaults to `true`
   - `entities`: Optional, array of additional graph entities to load into the profile, either `property` or `handler` must be specified.
     - `path`: __Required__, entity path to request, example `/me/memberOf`
+    - `params`: Optional, url parameters to pass to query, example `{ $filter: "foo eq 'bar'"}`
     - `property`: Property name within the profile object to insert the Graph API response. Example `foo` will fulfill `profile.foo = {...}`
     - `handler`: Callback handler in the form of `(profile, data)` to modify the profile object in a custom way based of the Graph API response passed as `data`
   - `auth`: [/{tenant}/oauth2/authorize](https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx)

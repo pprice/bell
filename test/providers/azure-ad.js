@@ -238,7 +238,185 @@ describe('azure-ad', () => {
         });
     });
 
-    it('requests additional graph entities', { parallel: false }, (done) => {
+    it('requests additional graph entities, and sets property values', { parallel: false }, (done) => {
+
+        const mock = new Mock.V2();
+        mock.start((provider) => {
+
+            const server = new Hapi.Server();
+            server.connection({ host: 'localhost', port: 80 });
+            server.register(Bell, (err) => {
+
+                expect(err).to.not.exist();
+
+                const custom = Bell.providers['azure-ad']({
+                    tenant: 'example.com',
+                    entities: [
+                        {
+                            path: '/foo',
+                            property: 'bar'
+                        }
+                    ]
+                });
+                Hoek.merge(custom, provider);
+
+                const graphResponse = {
+                    objectId: 'abcdefg',
+                    userPrincipalName: 'steve@example.com',
+                    displayName: 'steve smith',
+                    givenName: 'steve',
+                    surname: 'smith',
+                    mail: 'steve@example.com'
+                };
+
+                const fooResponse = {
+                    foo: 'foo'
+                };
+
+                Mock.override('https://graph.windows.net/example.com/', (uri, callback) => {
+
+                    let payload = null;
+
+                    if (uri.indexOf('/me') > 0) {
+                        payload = graphResponse;
+                    }
+                    else if (uri.indexOf('/foo') > 0) {
+                        payload = fooResponse;
+                    }
+
+                    if (payload) {
+                        return Hoek.nextTick(callback)(null, { statusCode: 200 }, JSON.stringify(payload));
+                    }
+
+                    return Hoek.nextTick(callback)(null, { statusCode: 404 });
+                });
+
+                server.auth.strategy('custom', 'bell', {
+                    password: 'cookie_encryption_password_secure',
+                    isSecure: false,
+                    clientId: 'azure-ad',
+                    clientSecret: 'secret',
+                    provider: custom
+                });
+
+                server.route({
+                    method: '*',
+                    path: '/login',
+                    config: {
+                        auth: 'custom',
+                        handler: function (request, reply) {
+
+                            reply(request.auth.credentials);
+                        }
+                    }
+                });
+
+                server.inject('/login', (res) => {
+
+                    const cookie = res.headers['set-cookie'][0].split(';')[0] + ';';
+                    mock.server.inject(res.headers.location, (mockRes) => {
+
+                        server.inject({ url: mockRes.headers.location, headers: { cookie: cookie } }, (response) => {
+
+                            Mock.clear();
+                            expect(response.result).to.deep.equal({
+                                provider: 'custom',
+                                token: '456',
+                                refreshToken: undefined,
+                                expiresIn: 3600,
+                                query: {},
+                                profile: {
+                                    bar: fooResponse,
+                                    id: graphResponse.objectId,
+                                    username: graphResponse.userPrincipalName,
+                                    displayName: graphResponse.displayName,
+                                    email: graphResponse.mail,
+                                    name: {
+                                        first: graphResponse.givenName,
+                                        last: graphResponse.surname
+                                    },
+                                    raw: graphResponse
+                                }
+                            });
+
+                            mock.stop(done);
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    it('requests additional graph entities, and calls handler', { parallel: false }, (done) => {
+
+        const mock = new Mock.V2();
+        mock.start((provider) => {
+
+            const server = new Hapi.Server();
+            server.connection({ host: 'localhost', port: 80 });
+            server.register(Bell, (err) => {
+
+                expect(err).to.not.exist();
+
+                const custom = Bell.providers['azure-ad']({
+                    tenant: 'example.com',
+                    requestMe: false,
+                    entities: [
+                        {
+                            path: '/with-params',
+                            params: {
+                                entityParam: true
+                            },
+                            handler: (profile, data) => {
+
+                                profile.custom = data;
+                                profile.custom2 = 'test';
+                            }
+                        }
+                    ]
+                });
+                Hoek.merge(custom, provider);
+
+                Mock.override('https://graph.windows.net/example.com/with-params', (uri, callback) => {
+
+                    Mock.clear();
+                    expect(uri).to.contain('entityParam=true');
+                    mock.stop(done);
+                });
+
+                server.auth.strategy('custom', 'bell', {
+                    password: 'cookie_encryption_password_secure',
+                    isSecure: false,
+                    clientId: 'azure-ad',
+                    clientSecret: 'secret',
+                    provider: custom
+                });
+
+                server.route({
+                    method: '*',
+                    path: '/login',
+                    config: {
+                        auth: 'custom',
+                        handler: function (request, reply) {
+
+                            reply(request.auth.credentials);
+                        }
+                    }
+                });
+
+                server.inject('/login', (res) => {
+
+                    const cookie = res.headers['set-cookie'][0].split(';')[0] + ';';
+                    mock.server.inject(res.headers.location, (mockRes) => {
+
+                        server.inject({ url: mockRes.headers.location, headers: { cookie: cookie } }, (response) => {});
+                    });
+                });
+            });
+        });
+    });
+
+    it('requests additional graph entities with parameters', { parallel: false }, (done) => {
 
         const mock = new Mock.V2();
         mock.start((provider) => {
